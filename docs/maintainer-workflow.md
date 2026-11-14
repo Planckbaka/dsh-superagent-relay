@@ -10,3 +10,5 @@ Start community development with GitHub Issues and human-reviewed PRs. For later
 4. Keep bot credentials, full agent transcripts and local state outside the repository and Discord. Never give the worker account-admin or release credentials.
 
 For DSH Market, use the GitHub `dsh-plugin` topic for discovery and submit a separate entry to the [curated catalog](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin).
+
+See the [ticket execution evidence proposal](ticket-execution-evidence.md) for the next reviewable improvement.
