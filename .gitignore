@@ -1,0 +1,7 @@
+node_modules/
+lib/
+.artifacts/
+.env
+coverage/
+
+node_modules
