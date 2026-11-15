@@ -2,7 +2,7 @@
 
 Superagent Relay is an independent community preview derived from the MIT-licensed [DeepSeek Superagent prototype](https://github.com/deepseek-ai/dsh-superagent-prototype/tree/8c32a9dc5d72c033816c6a8110b37f40cf94fba4). It runs as a native DSH Web bundle. Install it in a separate profile; it shares runtime and panel identifiers with the upstream bundle.
 
-The local preview exercises ticket intake, isolated DSH Worker sessions and persisted reports. A one-shot public GitHub Issue test imports its title and state, then saves the Worker summary locally. It does not monitor your inbox or write to GitHub. QQ and WeChat have a normalization library only; Discord is planned.
+The local preview exercises ticket intake, isolated DSH Worker sessions and persisted reports. A one-shot public GitHub Issue test imports its title and state, then saves the Worker summary locally. It does not monitor your inbox or write to GitHub. QQ and WeChat have a normalization library only. A local Discord conversation adapter has passed a real request-to-Worker-to-reply test, but it is not included in the existing release asset; see the [implementation gap audit](docs/010-superagent-gap-audit.md).
 
 ## Install the preview
 
@@ -43,6 +43,18 @@ pnpm check
 pnpm pack
 ```
 
-Use GitHub Issues for reproducible bugs and pull requests for contributions. Include DSH version, platform, expected behavior, and a sanitized reproduction. See [maintainer workflow](docs/maintainer-workflow.md). A Discord invite will be added when the server is ready.
+Use GitHub Issues for reproducible bugs and pull requests for contributions. Include DSH version, platform, expected behavior, and a sanitized reproduction. See [maintainer workflow](docs/maintainer-workflow.md). Join the [Superagent Relay Discord community](https://discord.gg/dTJFHEFNyJ) for user discussion and contributor coordination. GitHub Issues and pull requests remain the record for bugs, implementation proposals and reviews. Joining Discord does not grant permission to execute agent tasks.
 
 MIT; upstream attribution is preserved in [LICENSE](LICENSE).
+
+
+## Implementation status
+
+The upstream core, the local tested checkout and the published release are separate artifacts.
+The local Discord round trip has been verified; full Source/Policy/Outbox integration, structured
+human questions, pause semantics, real failure recovery and the dedicated GitHub write pilot
+still need work or further acceptance. Read the [2026-11-15 design gap audit](docs/010-superagent-gap-audit.md)
+for evidence, priorities and acceptance gates. The audit does not mean these changes have shipped
+in `v0.1.0-preview.1`.
+
+Repository topics support discovery; they do not guarantee acceptance into a curated DSH Market catalog.
