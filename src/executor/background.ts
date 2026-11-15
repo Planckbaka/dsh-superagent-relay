@@ -5,6 +5,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import { setTimeout as delay } from 'node:timers/promises'
 
 /** What the Executor uses of DSH's job registry: the jobs a Session can see, their events, a wait for one and a kill. */
 interface Jobs {
@@ -15,7 +16,7 @@ interface Jobs {
 }
 /** What the Executor uses of DSH's subagents: joining a worker's subagents that work, its subagents, and releasing them. */
 interface Subagents {
-  waitForChildren(parent: Agent): Promise<boolean>
+  waitForChildren?(parent: Agent): Promise<boolean>
   listChildren(parentSessionId: string): Promise<readonly { id: string }[]>
   drainChildren(parent: Agent, childIds: readonly string[]): Promise<void>
 }
@@ -46,13 +47,25 @@ export function until<T>(work: Promise<T>, signal?: AbortSignal, ms?: number): P
 export const cancelled = new WeakSet<Agent>()
 /** The pending join of each worker's subagents, which DSH cannot cancel, so a later look joins the same one. */
 const joins = new WeakMap<Agent, Promise<boolean>>()
-function childrenEnd(subagents: Subagents, agent: Agent): Promise<boolean> {
+function childrenEnd(wait: (parent: Agent) => Promise<boolean>, agent: Agent): Promise<boolean> {
   let join = joins.get(agent)
   if (!join) {
-    join = subagents.waitForChildren(agent).finally(() => { joins.delete(agent) })
+    join = wait(agent).finally(() => { joins.delete(agent) })
     joins.set(agent, join)
   }
   return join
+}
+
+/** Older DSH hosts expose the child catalog but no join. Never treat a live child as settled. */
+async function catalogChildrenEnd(ctx: Context, subagents: Subagents, agent: Agent, signal: AbortSignal): Promise<boolean> {
+  let waited = false
+  while (!signal.aborted && agent.status === 'idle') {
+    const children = await until(subagents.listChildren(agent.id), signal)
+    if (!children || !children.some(child => ctx.agents.get(child.id as SessionId))) return waited
+    waited = true
+    await delay(250, undefined, { signal, ref: false }).catch(() => {})
+  }
+  return waited
 }
 
 /** A job by its id and the first line of its label. */
@@ -96,7 +109,8 @@ function jobsEnd(ctx: Context, sessionId: string, signal: AbortSignal, except?: 
 export async function untilQuiet(ctx: Context, agent: Agent, signal: AbortSignal, except?: ReadonlySet<string>): Promise<boolean> {
   for (;;) {
     const subagents = subagentsOf(ctx)
-    const children = subagents ? await until(childrenEnd(subagents, agent), signal) : false
+    const children = subagents?.waitForChildren ? await until(childrenEnd(subagents.waitForChildren.bind(subagents), agent), signal)
+      : subagents ? await catalogChildrenEnd(ctx, subagents, agent, signal) : false
     const jobs = await jobsEnd(ctx, agent.id, signal, except)
     if (signal.aborted || agent.status !== 'idle') return false
     if (!children && !jobs) return true

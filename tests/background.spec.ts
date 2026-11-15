@@ -38,6 +38,25 @@ it('stops waiting for subagents that never settle once the host stops', async ()
   expect(await quiet).toBe(false)
 })
 
+it('settles a worker on a host without a subagent join once its catalog has no live child', async () => {
+  const { ctx, agent, subagents } = setup(async () => false)
+  const service = { listChildren: vi.fn(subagents.listChildren) }
+  vi.spyOn(ctx, 'get').mockImplementation((name: string) => name === 'subagents' ? service as never : undefined as never)
+  const lookup = vi.spyOn(ctx.agents, 'get').mockReturnValue(agent)
+  const stop = new AbortController()
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const settled = vi.fn()
+    const quiet = untilQuiet(ctx, agent, stop.signal).then(settled)
+    await vi.advanceTimersByTimeAsync(10)
+    expect(settled).not.toHaveBeenCalled()
+    lookup.mockReturnValue(undefined)
+    await vi.advanceTimersByTimeAsync(300)
+    await quiet
+    expect(settled).toHaveBeenCalledWith(true)
+  } finally { stop.abort(); vi.useRealTimers() }
+})
+
 it('looks at the jobs only when one ends, not at each output of a noisy one', async () => {
   const { ctx, agent, jobs } = setup(async () => false)
   const id = jobs.run('worker-t1')
