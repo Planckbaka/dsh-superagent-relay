@@ -15,6 +15,7 @@ import tempfile
 REQUIRED = {
     'package/package.json', 'package/README.md', 'package/LICENSE', 'package/CHANGELOG.md',
     'package/cordis.patch.yml', 'package/lib/index.js', 'package/lib/index.d.ts',
+    'package/lib/client.js', 'package/lib/github-watch.js', 'package/lib/feishu-watch.js',
     'package/scripts/relay-web.py', 'package/scripts/relay-watchdog.py',
     'package/scripts/verify-release.py', 'package/docs/011-native-implementation.md',
 }

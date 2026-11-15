@@ -5,6 +5,7 @@
 - Add read-only GitHub checks for locked installation, typecheck/tests/build and exact distribution inspection, with immutable external action pins and no stored Git credentials.
 - Add a standalone archive inspector for required assets, version/identity, unsafe members, duplicates, unpacked limits, private files and credential/home-path matches; error output never includes matched values.
 - Track stable promotion using separate real-task, clarification, recovery, artifact and independent-review evidence. Preview.2 remains immutable while these gates are pending.
+- Preserve Feishu event parsing errors when a delayed readiness line arrives on a separate process stream; readiness no longer hides a real ingestion problem.
 
 ## 0.1.0-preview.2
 

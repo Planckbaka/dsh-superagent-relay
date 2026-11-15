@@ -13,7 +13,7 @@ function inspect(extra: { name: string; text?: string; type?: string }[] = [], r
   const archive = join(dir, 'candidate.tgz')
   const fixture = `import io,json,sys,tarfile
 v=json.load(sys.stdin)
-required=['package.json','README.md','LICENSE','CHANGELOG.md','cordis.patch.yml','lib/index.js','lib/index.d.ts','scripts/relay-web.py','scripts/relay-watchdog.py','scripts/verify-release.py','docs/011-native-implementation.md']
+required=['package.json','README.md','LICENSE','CHANGELOG.md','cordis.patch.yml','lib/index.js','lib/index.d.ts','lib/client.js','lib/github-watch.js','lib/feishu-watch.js','scripts/relay-web.py','scripts/relay-watchdog.py','scripts/verify-release.py','docs/011-native-implementation.md']
 with tarfile.open(sys.argv[1],'w:gz') as bundle:
  for name in required:
   if name==v['removed']:continue
@@ -54,6 +54,7 @@ it.each(['.env', '.env.production', 'hosts.yml', 'discord.json', 'web-cookies', 
 })
 it('rejects a missing launcher and wrong package/version', () => {
   expect(inspect([], 'scripts/relay-web.py').report.issues).toContain('missing_runtime_assets')
+  expect(inspect([], 'lib/client.js').report.issues).toContain('missing_runtime_assets')
   expect(inspect([], '', { name: 'wrong-package', version: '0.2.0' }).report.issues).toEqual(expect.arrayContaining(['unexpected_package_name', 'version_mismatch']))
 })
 it('reports credential and home-path categories without exposing matched values or member names', () => {
