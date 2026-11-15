@@ -13,7 +13,7 @@ dsh relay --from-default-profile web --dump-config >/dev/null
 dsh plugin --profile relay add https://github.com/Planckbaka/dsh-superagent-relay/releases/download/v0.1.0-preview.2/dsh-superagent-relay-0.1.0-preview.2.tgz
 ```
 
-Configure the profile's model and a fresh absolute `stateDir`. Keep the bundled legacy GitHub/Feishu watch plugins disabled; native Sources are configured through Superagent settings. Do not set `DSH_SUPERAGENT_LOCAL_FIXTURE`, `DSH_SUPERAGENT_READ_ONLY`, or legacy Discord lab/chat flags for a native deployment.
+Configure the profile's model and a fresh absolute `stateDir`. Native Sources are configured through Superagent settings: keep the bundled GitHub watch plugin enabled, because it registers the GitHub Source kind the native GitHub Source uses, and keep the bundled Feishu watch plugin disabled unless you configure a Feishu Source. Do not set `DSH_SUPERAGENT_LOCAL_FIXTURE`, `DSH_SUPERAGENT_READ_ONLY`, or legacy Discord lab/chat flags for a native deployment.
 
 For deployment with one-time account, policy and Discord initialization, extract the release archive and use its launcher:
 
