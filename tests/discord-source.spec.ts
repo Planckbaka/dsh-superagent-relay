@@ -7,6 +7,7 @@ import { DiscordSource, discordTrigger, type DiscordMessage } from '../src/sourc
 import type { SourceContext } from '../src/sources/host.ts'
 import type { OutboundMessage } from '../src/core/index.ts'
 import { family } from '../src/kv.ts'
+import { Store } from '../src/app/store.ts'
 import { startRuntime, type Host } from './fixtures/host.ts'
 
 const channel = '100000000000000001', owner = '100000000000000002', bot = '100000000000000003'
@@ -84,6 +85,40 @@ it('restarts long deliveries at the first unsent chunk and retains stable retry 
   expect(x.state.get(binding(channel, '100000000000000093'))).toMatchObject({ root: event.id, ticket: 'ticket-1' })
   await restarted.send(message)
   expect(bodies).toHaveLength(4)
+})
+it('reopens SQLite after a server-accepted POST loses its response and recovers its reply binding', async () => {
+  const { ctx, stop } = harness()
+  const path = join(dir, 'delivery.sqlite')
+  const accepted = new Map<string, string>()
+  const attempts: string[] = []
+  const transport: typeof fetch = async (url, init) => {
+    if (String(url).endsWith('/users/@me')) return Response.json({ id: bot, bot: true })
+    const { nonce, enforce_nonce } = JSON.parse(String(init?.body))
+    expect(enforce_nonce).toBe(true)
+    attempts.push(nonce)
+    const previous = accepted.get(nonce)
+    if (previous) return Response.json({ id: previous })
+    const id = String(100000000000000090n + BigInt(accepted.size))
+    accepted.set(nonce, id)
+    if (accepted.size === 2) throw new Error('response lost after acceptance')
+    return Response.json({ id })
+  }
+  const open = (store: Store) => new DiscordSource(() => ({ ...ctx, atomic: work => store.atomic(work),
+    state: { ...ctx.state, get: key => store.get(key), set: (key, value) => store.set(key, value) } }), stop.signal, { fetch: transport })
+  const message = outbound('A'.repeat(1800) + 'B')
+  const first = new Store(path)
+  try {
+    await expect(open(first).send(message)).rejects.toThrow('response lost')
+    expect(first.get(binding(channel, '100000000000000090'))).toBeDefined()
+    expect(first.get(binding(channel, '100000000000000091'))).toBeUndefined()
+  } finally { first.close() }
+  const restarted = new Store(path)
+  try {
+    await expect(open(restarted).send(message)).resolves.toBe('sent')
+    expect(attempts).toEqual([attempts[0], attempts[1], attempts[1]])
+    expect(accepted.size).toBe(2)
+    expect(restarted.get(binding(channel, '100000000000000091'))).toMatchObject({ root: event.id, ticket: 'ticket-1' })
+  } finally { restarted.close() }
 })
 it.each([401, 403, 404, 429, 500])('retains delivery after HTTP %s rather than killing the source or losing the receipt', async status => {
   const x = harness()
