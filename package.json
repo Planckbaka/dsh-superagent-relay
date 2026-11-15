@@ -2,9 +2,9 @@
   "name": "dsh-superagent-relay",
   "author": "Superagent Relay contributors",
   "license": "MIT",
-  "version": "0.1.0-preview.1",
+  "version": "0.1.0-rc.1",
   "private": true,
-  "description": "Community preview of the DeepSeek Harness Superagent: isolated issue intake and persistent Worker reports.",
+  "description": "DeepSeek Harness Superagent with native Discord intake, policy-gated work, persistent delivery and configurable execution permissions.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -24,8 +24,13 @@
     "cordis.patch.yml",
     "locale/*.json",
     "README.md",
+    "SETUP.md",
     "prompts",
-    "skills"
+    "skills",
+    "docs",
+    "scripts/*.py",
+    "scripts/dsh-superagent",
+    "CHANGELOG.md"
   ],
   "dsh": {
     "bundle": {

@@ -99,3 +99,16 @@ it('records nothing for a pause that changes nothing, refuses a sync while setup
   vi.mocked(Setup.prototype.configured).mockRestore()
   expect(() => settings.block('source:x')).toThrow(new UserError('unknownBlock', { block: 'source:x' }))
 })
+it('restarts after an operator changes permissions and refuses the same escalation from a model tool', async () => {
+  h = await startRuntime()
+  const { settings, store, setup } = h.runtime
+  const restart = vi.spyOn(setup, 'restart').mockImplementation(() => {})
+  const revision = store.blockRevision('executor')
+  const executor = { ...store.settings().executor, permissionPreset: 'danger-full-access' as const }
+  await expect(settings.save('executor', executor, revision, 'tool')).rejects.toThrow()
+  expect(restart).not.toHaveBeenCalled()
+  const saved = await settings.save('executor', executor, revision, 'panel')
+  expect(saved.restarting).toBe(true)
+  expect(store.settings().executor.permissionPreset).toBe('danger-full-access')
+  expect(restart).toHaveBeenCalledTimes(1)
+})

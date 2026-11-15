@@ -15,9 +15,12 @@ interface Jobs {
 }
 /** What the Executor uses of DSH's subagents: joining a worker's subagents that work, its subagents, and releasing them. */
 interface Subagents {
-  waitForChildren(parent: Agent): Promise<boolean>
-  listChildren(parentSessionId: string): Promise<readonly { id: string }[]>
-  drainChildren(parent: Agent, childIds: readonly string[]): Promise<void>
+  waitForChildren?(parent: Agent): Promise<boolean>
+  listChildren?(parentSessionId: string): Promise<readonly { id: string }[]>
+  drainChildren?(parent: Agent, childIds: readonly string[]): Promise<void>
+  waitForTreeWork?(root: Agent): Promise<boolean>
+  listDescendants?(rootSessionId: string, signal?: AbortSignal): Promise<readonly { id: string }[]>
+  interrupt?(sessionId: string, authority: { kind: 'ancestor'; agent: Agent }): void
 }
 /** How long a stop waits for a killed job to end, collecting its end so the worker is not woken to hear of it. */
 const KILL_WAIT_MS = 10_000
@@ -46,14 +49,15 @@ export function until<T>(work: Promise<T>, signal?: AbortSignal, ms?: number): P
 export const cancelled = new WeakSet<Agent>()
 /** The pending join of each worker's subagents, which DSH cannot cancel, so a later look joins the same one. */
 const joins = new WeakMap<Agent, Promise<boolean>>()
-function childrenEnd(subagents: Subagents, agent: Agent): Promise<boolean> {
+function childrenEnd(wait: (parent: Agent) => Promise<boolean>, agent: Agent): Promise<boolean> {
   let join = joins.get(agent)
   if (!join) {
-    join = subagents.waitForChildren(agent).finally(() => { joins.delete(agent) })
+    join = wait(agent).finally(() => { joins.delete(agent) })
     joins.set(agent, join)
   }
   return join
 }
+
 
 /** A job by its id and the first line of its label. */
 const named = (job: { id: string; label?: string }) => { const line = job.label?.split('\n')[0]?.trim(); return line ? `${job.id} (${line})` : job.id }
@@ -96,7 +100,9 @@ function jobsEnd(ctx: Context, sessionId: string, signal: AbortSignal, except?: 
 export async function untilQuiet(ctx: Context, agent: Agent, signal: AbortSignal, except?: ReadonlySet<string>): Promise<boolean> {
   for (;;) {
     const subagents = subagentsOf(ctx)
-    const children = subagents ? await until(childrenEnd(subagents, agent), signal) : false
+    const join = subagents?.waitForTreeWork ?? subagents?.waitForChildren
+    if (subagents && !join) throw new Error('DSH subagent service does not expose a supported wait method')
+    const children = join ? await until(childrenEnd(join.bind(subagents), agent), signal) : false
     const jobs = await jobsEnd(ctx, agent.id, signal, except)
     if (signal.aborted || agent.status !== 'idle') return false
     if (!children && !jobs) return true
@@ -141,10 +147,21 @@ export async function collectJob(ctx: Context, sessionId: string, job: { id: str
 export async function stopSubagents(ctx: Context, agent: Agent, keepInbox = false): Promise<void> {
   const subagents = subagentsOf(ctx)
   if (!subagents) return
-  // The catalog lists every subagent the Session had; one that ended has no agent.
-  const live = (await subagents.listChildren(agent.id)).map(child => child.id).filter(id => ctx.agents.get(id as SessionId))
-  if (!live.length) return
-  try { await until(subagents.drainChildren(agent, live), undefined, DRAIN_LIMIT_MS) }
+  let stop: () => Promise<unknown>
+  if (subagents.listChildren && subagents.drainChildren) {
+    const live = (await subagents.listChildren(agent.id)).map(child => child.id).filter(id => ctx.agents.get(id as SessionId))
+    if (!live.length) return
+    stop = () => subagents.drainChildren!(agent, live)
+  } else if (subagents.listDescendants && subagents.interrupt && subagents.waitForTreeWork) {
+    const ids = await subagents.listDescendants(agent.id, AbortSignal.timeout(DRAIN_LIMIT_MS))
+    if (!ids.length) return
+    // Draining a tree permanently closes admission for this root. Handoff must let it delegate again after a human reply.
+    stop = async () => {
+      for (const id of new Set(ids.map(child => child.id))) subagents.interrupt!(id, { kind: 'ancestor', agent })
+      await subagents.waitForTreeWork!(agent)
+    }
+  } else throw new Error('DSH subagent service does not expose supported stop methods')
+  try { await until(stop(), undefined, DRAIN_LIMIT_MS) }
   finally {
     if (agent.status !== 'idle') cancelled.add(agent)
     agent.cancel({ kind: 'user' }, { keepInbox })

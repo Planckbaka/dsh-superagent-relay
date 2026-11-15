@@ -290,6 +290,11 @@ Some generic modules still refer directly to GitHub or Feishu:
 
 | Path | Responsibility |
 | --- | --- |
+| `src/sources/discord.ts` | Native Discord Source: policy-gated intake, thread context, Outbox delivery and persistent chunk checkpoints |
+| `src/app/bootstrap.ts` | One-time native profile initialization with separate GitHub/Discord identities |
+| `src/app/discord-reports.ts` | Quiet, structured Discord report notifications through native replies |
+| `src/discord-chat.ts` | Durable Discord conversation intake, controls and lifecycle replies |
+| `src/discord-lab.ts` | Read-only Discord test channel intake |
 | `src/im-ingress.ts` | Validated IM message normalization |
 | `src/local-loop.ts` | Local fixture and public Issue intake |
 | `src/index.ts` | The main plugin entry: reads the machine settings, starts the Runtime, and gives it the restart that a save of a Source's account uses |
@@ -438,6 +443,13 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/cards.spec.ts` | The rules the built-in text must state, file by file |
 | `tests/model-surface.spec.ts` | Everything models read: tools, prompts, skills and inputs, checked against the tool schemas, the execution environment and the glossary, within a size budget per role |
 | `tests/deployment.spec.ts`, `tests/environment.spec.ts`, `tests/index.spec.ts` | The plugin configuration and setup, the agent's process environment, the plugin entry |
+| `tests/watchdog.spec.ts` | Actual subprocess crash/restart, authenticated health probes, intentional shutdown and secret-free snapshots |
+| `tests/release-verification.spec.ts` | Release archive integrity, private-content detection, unsafe paths and size limits. |
+| `tests/bootstrap.spec.ts` | Fresh profile bootstrap, native write permission checks, account separation and credential redaction |
+| `tests/discord-source.spec.ts` | Native Discord authorization, transient intake, chunk recovery, pause, question/resume and delivery isolation |
+| `tests/discord-chat.spec.ts` | Conversation authorization, delivery, restart and command regression coverage |
+| `tests/discord-lab.spec.ts` | Discord test channel and actor filtering |
+
 | `tests/personal-lab.spec.ts` | Two isolated synthetic tickets, duplicate delivery and rejection of late results |
 | `tests/service-script.spec.ts` | `scripts/dsh-superagent` against fake `ps`, `tmux` and `dsh` |
 | `tests/client.spec.tsx`, `tests/navigation.spec.ts`, `tests/controls.spec.tsx` | The client plugin's registration and polling, Session navigation and route memory, the local controls, and the panel's imports, which have no cycle |
@@ -618,3 +630,5 @@ Point `DSH_HOME` at a temporary directory and create a new profile there. Copy t
 
 - Trust: which Trigger fields are trusted, such as the Source's actor and Thread membership, and which are not, such as the body and quotes.
 - Deployment isolation: the agent's profile on its own pinned DeepSeek Harness installation, so upgrading DeepSeek Harness elsewhere does not break it.
+
+Discord lab intake persists its read cursor beside the local config, retries transient failures, and publishes `discord-lab` health. It reports ignored owner role mentions without accepting them as bot mentions. Intake must complete before checkpointing; Engine trigger IDs deduplicate replays. Discord results remain local and no outbound send permission is required.
