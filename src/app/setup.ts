@@ -10,6 +10,7 @@ export interface SetupHost {
   readonly context: Context
   readonly machine: Machine
   readonly lifetime: AbortSignal
+  expectedAgent?(): string | undefined
   restart(): void
 }
 
@@ -81,6 +82,10 @@ export class Setup {
     }
     const probe = this.probe()
     const deployment = await resolveDeployment(machine, settings.sources.github?.config, probe)
+    const expected = this.host.expectedAgent?.()
+    if (expected && deployment.github.login.toLowerCase() !== expected.toLowerCase()) {
+      throw new SetupError('agentIdentityMismatch', { expected, account: deployment.github.login })
+    }
     const feishu = await resolveFeishuBot(machine, settings.sources.feishu?.config, probe).catch((error: unknown) => {
       if (!(error instanceof SetupError)) throw error
       this.feishuProblem = error.problem

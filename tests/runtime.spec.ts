@@ -1064,16 +1064,15 @@ it('passes team text with template braces to every Session literally, without re
   }
 })
 
-it('leaves auto-merge to the delivery requirements, with the agent\'s own gh and the line threshold', async () => {
+it('requires explicit repository write authorization and reserves merge/release for maintainers', async () => {
   const { ticket } = await acceptedTicket()
   expect(runtime.ticketEnvironment(ticket).map(variable => variable.key)).not.toContain('DSH_SUPERAGENT_GITHUB_MERGE_ACCOUNT')
   expect(ticket.mandate).not.toHaveProperty('autoMergeLineLimit')
   const delivery = runtime.prompts.current().config.delivery
-  expect(delivery).toContain('it changes fewer than 200 lines (additions plus deletions);')
-  // Auto-merge is never enabled as the agent account; only a merge CLI the section names enables it.
-  expect(delivery).toContain('Never enable auto-merge as the agent account')
-  expect(delivery).toContain('<merge CLI> pr merge <number> --auto --merge --match-head-commit <sha>')
-  expect(runtime.prompts.preview(runtime.prompts.current().config).worker).not.toContain('gh-merge')
+  expect(delivery).toContain('maintainer explicitly approves the repository write for this ticket')
+  expect(delivery).toContain('dedicated agent identity')
+  expect(delivery).toContain('Do not push to the default branch, force-push')
+  expect(delivery).toContain('approve or merge PRs, enable auto-merge, or publish releases')
 })
 
 it('runs the prepare command once for a new ticket, under the execution root with the ticket\'s environment, and fails the ticket with its output', async () => {
@@ -1131,13 +1130,11 @@ it('runs a GitHub-only deployment: the GitHub part of the Policy decides alone, 
 })
 
 
-it('credits each human reviewer once in the default delivery requirements on every commit of the PR, never with an empty commit', async () => {
+it('requires repository review and avoids instructing workers to rewrite branch history', async () => {
   const delivery = runtime.prompts.current().config.delivery
-  expect(delivery).toContain('Co-authored-by: <name or login> <id+login@users.noreply.github.com>')
-  expect(delivery).toContain('on every commit of the PR branch')
-  expect(delivery).toContain('git filter-branch -f --msg-filter')
-  expect(delivery).toContain('Never push an empty commit to credit a reviewer.')
-  expect(delivery).toContain('Do not credit bots')
+  expect(delivery).toContain('Request the reviews required by repository policy')
+  expect(delivery).not.toContain('git filter-branch')
+  expect(delivery).toContain('Report overlapping work to the maintainer')
 })
 
 it('shows a failed reply as a problem with its attempts, an error of the reply effects after three, until it is withdrawn', async () => {

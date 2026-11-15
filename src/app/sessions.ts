@@ -134,7 +134,7 @@ export class Sessions {
       if (status === 'idle' && !this.host.closing()) { this.retryHealth.clear(agent.id); this.updateModelHealth() }
     })
   }
-  /** Resolves or creates session `id` in workspace `cwd`, initializes its role model, decorates it with prompts/skills/tools, sets `danger-full-access` permissions, and renames it to `title`. */
+  /** Resolves or creates session `id` in workspace `cwd`, initializes its role model, decorates it with prompts/skills/tools, sets the configured execution permissions, and renames it to `title`. */
   async ensure(id: string, cwd: string, title: string, role: 'orchestrator' | 'worker'): Promise<Agent> {
     const ctx = this.ctx
     let result = await ctx.sessionController.resolveAgent(id as SessionId)
@@ -149,7 +149,7 @@ export class Sessions {
     const settings = this.host.store.settings()
     await initializeRoleModel(ctx, result.agent, role === 'orchestrator' ? settings.eval.model : settings.executor.model)
     await this.decorate(result.agent)
-    ctx.permissionPresets.set(result.agent.session, process.env.DSH_SUPERAGENT_LOCAL_FIXTURE === '1' ? 'read-only' : 'danger-full-access')
+    ctx.permissionPresets.set(result.agent.session, process.env.DSH_SUPERAGENT_LOCAL_FIXTURE === '1' || process.env.DSH_SUPERAGENT_READ_ONLY === '1' ? 'read-only' : settings.executor.permissionPreset)
     await ctx.sessionController.rename({ sessionId: id as SessionId, title })
     return result.agent
   }
@@ -315,6 +315,7 @@ export class Sessions {
     }
     const ticketId = parent === undefined ? undefined : ticketOfSession(parent)
     if (ticketId === undefined || !this.host.store.tickets.get(ticketId)) return
+    this.ctx.permissionPresets.set(agent.session, process.env.DSH_SUPERAGENT_LOCAL_FIXTURE === '1' || process.env.DSH_SUPERAGENT_READ_ONLY === '1' ? 'read-only' : this.host.store.settings().executor.permissionPreset)
     this.bindings.set(agent, { disposers: this.workOnly(agent, ticketId), subagent: true })
   }
   /** Register the skills of a prompt version in the agent's skill scope, in place of an earlier version's. */

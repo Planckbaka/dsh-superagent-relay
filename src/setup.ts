@@ -13,6 +13,7 @@ export const SETUP_PROBLEMS = {
   agentCliNoAccount: ['github', 'The agent GitHub CLI did not report a GitHub account.'],
   repositoryUnreadable: ['github', '@{account} cannot read {repository}.'],
   repositoryUnreported: ['github', 'The agent GitHub CLI did not return {repository}.'],
+  agentIdentityMismatch: ['github', 'Expected dedicated agent @{expected}, but the CLI is signed in as @{account}.'],
   repositoryReadOnly: ['github', '@{account} cannot push to {repository}.'],
   feishuCliFailed: ['feishu', 'The bot lark-cli does not work.'],
   feishuNoApp: ['feishu', 'auth status of the bot lark-cli did not report the app.'],

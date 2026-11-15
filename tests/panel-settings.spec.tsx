@@ -53,7 +53,7 @@ it('saves the Eval block on the Policy settings and the Executor with its execut
     'worker-model'); await type(effort as HTMLInputElement, 'high')
   expect([...document.querySelectorAll('#dt-worker-model-efforts option')].map(option => option.getAttribute('value'))).toEqual(['high'])
   await click(zh.save)
-  expect(server.settings.executor).toEqual({ maxWorkers: 5, directory: '/srv/work',
+  expect(server.settings.executor).toEqual({ permissionPreset: 'workspace-write', maxWorkers: 5, directory: '/srv/work',
     prepare: 'git worktree add "$DSH_SUPERAGENT_DIR"', blockedCommands: ['gh-personal', 'gh.other'], model: { provider: 'worker-provider',
       model: 'worker-model', reasoningEffort: 'high' } })
   expect(server.requests.filter(request => request.method === 'PUT').map(request => request.path)).toEqual(['settings/eval',
@@ -144,4 +144,15 @@ it('lists the settings groups stages first, opens each stage\'s group from its s
   await remount()
   await click(tab(zh['tab.settings']))
   expect(document.querySelector('.dt-settings-link[aria-current="page"]')?.textContent).toBe(zh['promptPart.runtime/work'])
+})
+it('lets an authenticated operator select and save the execution permission ceiling', async () => {
+  await mount()
+  await click(zh['tab.execution'])
+  await click(find(zh['tab.settings'], '.dt-status-head button'))
+  const select = field<HTMLSelectElement>(zh.permissionPreset)
+  expect([...select.options].map(option => option.value)).toEqual(['read-only', 'workspace-write', 'danger-full-access'])
+  expect(select.value).toBe('workspace-write')
+  await act(async () => { select.value = 'danger-full-access'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+  await click(zh.save)
+  expect(server.settings.executor.permissionPreset).toBe('danger-full-access')
 })

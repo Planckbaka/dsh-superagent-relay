@@ -60,6 +60,8 @@ export interface SourceContext {
     threadClosed(thread: ThreadRef, outcome: 'merged' | 'closed', at: string): void
   }
   triggers: { get(id: string): Trigger | undefined; /** The newest Trigger on a Thread. */ latest(thread: string): Trigger | undefined }
+  /** Read delivery status for safe transport-index retention; optional for external contexts. */
+  replyStatus?(id: string): import('../core/index.ts').ReplyStatus | undefined
   notify(message: OutboundMessage): void
   /** Reports the state of one of this kind's declared health entries; throws for undeclared entry names. */
   report(entry: string, health: Health): void

@@ -25,6 +25,9 @@ import { ticketCard } from './cards.ts'
 import { MasterAssessor } from './assessment.ts'
 import { KV } from '../kv.ts'
 import { Store } from './store.ts'
+import { bootstrapSettings } from './bootstrap.ts'
+import { watchDiscordLab } from '../discord-lab.ts'
+import { DiscordSource, discordCredentials } from '../sources/discord.ts'
 import { githubIssueKind, githubIssueTrigger, localKind, localTrigger } from '../local-loop.ts'
 import { evalsHealth } from './views/overview.ts'
 import { TextCache } from './cache.ts'
@@ -81,6 +84,7 @@ export class Runtime extends Service implements SourceHost {
   private releaseLock?: () => Promise<void>
   private closingFlag = false
   private stopping?: Promise<void>
+  private discordTask?: Promise<void>
   private readonly sourceDeps: SourceContextDeps
   private readonly toolHost: MainToolsHost & ExecutorToolsHost
   /** Non-zero while a main-Session tool is executing an Engine command, suppressing self-triggered domain event notices. */
@@ -97,7 +101,7 @@ export class Runtime extends Service implements SourceHost {
     try {
       const report = (error: unknown) => { ctx.logger.warn('dsh-superagent: %s', String(error)) }
       const store = opened = this.store = new Store(join(machine.stateDir, 'orchestrator.sqlite'), report)
-      const setup = this.setup = new Setup({ context: ctx, machine, lifetime: this.lifetime, restart })
+      const setup = this.setup = new Setup({ context: ctx, machine, lifetime: this.lifetime, restart, expectedAgent: () => store.get<string>('relay-bootstrap-agent') })
       const deployed = () => setup.configured()
         ? environmentOf({ deployment: setup.deployment, sources: this.sources, settings: store.settings() }) : undefined
       const feishu = () => setup.configured() && !!setup.deployment.feishu
@@ -200,6 +204,26 @@ export class Runtime extends Service implements SourceHost {
   /** Hold evaluation, dispatch, and outbound delivery while paused or awaiting setup; sources still record incoming triggers. */
   private paused(): boolean { return !this.setup.configured() || this.store.settings().paused }
   private async initialize(): Promise<void> {
+    const bootstrap = process.env.DSH_SUPERAGENT_INITIAL_CONFIG
+    if (bootstrap && !this.store.get('relay-bootstrap-agent')) {
+      const initialized = bootstrapSettings(bootstrap, this.store.settings())
+      this.store.atomic(() => {
+        this.store.saveSettings(initialized.settings)
+        this.store.set('relay-bootstrap-agent', initialized.agentLogin)
+      })
+    }
+    const chat = process.env.DSH_SUPERAGENT_DISCORD_CHAT
+    const discordSource = new DiscordSource(() => this.context({ kind: 'discord', health: ['discord'] }), this.lifetime,
+      { paused: () => this.paused() })
+    this.disposers.push(this.sources.register(discordSource.kind))
+    if (chat && !this.store.settings().sources.discord) {
+      const credentials = discordCredentials(chat)
+      const settings = this.store.settings()
+      this.store.saveSettings({ ...settings,
+        sources: { ...settings.sources, discord: { enabled: true, config: { configFile: chat, pollSeconds: 3 } } },
+        policy: { ...settings.policy, sources: { ...settings.policy.sources,
+          discord: { allowed: [{ id: credentials.owner }], admission: {} } } } })
+    }
     // Register management HTTP routes before setup completes so operators can fix setup problems in the UI.
     this.disposers.push(registerHttp(this.ctx, this.httpHost()))
     if (!await this.setup.run(this.store.settings())) {
@@ -211,9 +235,9 @@ export class Runtime extends Service implements SourceHost {
       this.sources.register(localKind)
       this.sources.register(githubIssueKind)
       const settings = this.store.settings()
-      this.store.saveSettings({ ...settings, sources: { lab: { enabled: true, config: {} }, 'github-issue': { enabled: true, config: {} } },
-        policy: { ...settings.policy, sources: { lab: { allowed: [{ id: 'operator' }], admission: {} }, 'github-issue': { allowed: [{ id: 'operator' }], admission: {} } } },
-        eval: { ...settings.eval, mode: 'off' },
+      this.store.saveSettings({ ...settings, sources: { ...settings.sources, lab: { enabled: true, config: {} }, 'github-issue': { enabled: true, config: {} } },
+        policy: { ...settings.policy, sources: { ...settings.policy.sources, lab: { allowed: [{ id: 'operator' }], admission: {} }, 'github-issue': { allowed: [{ id: 'operator' }], admission: {} } } },
+        eval: { ...settings.eval, mode: chat ? settings.eval.mode : 'off' },
         executor: { ...settings.executor, prepare: '', directory: '', maxWorkers: 2 } })
     }
     this.sessions.install()
@@ -225,7 +249,31 @@ export class Runtime extends Service implements SourceHost {
     this.executor.resume()
     this.passes.start()
     this.effects.start()
-    if (fixture && process.env.DSH_SUPERAGENT_GITHUB_ISSUE) {
+    const discord = fixture && process.env.DSH_SUPERAGENT_DISCORD_LAB
+    this.discordTask = discordSource.watch().catch(() => {
+      if (!this.lifetime.aborted) this.context({ kind: 'discord', health: ['discord'] }).report('discord',
+        { state: 'error', detail: 'Discord source stopped; check private configuration' })
+    })
+    if (chat) {
+      // Native Discord intake is independently scheduled; the fixture never synthesizes its actors or decisions.
+    } else if (discord) {
+      const discordHealth = this.board.claim('discord-lab')
+      void watchDiscordLab(discord, this.lifetime, trigger => {
+        this.store.atomic(() => {
+          if (this.store.triggers.disposition(trigger.id)?.decisionId) return
+          this.receive(trigger)
+          this.engine.decide(trigger.id, { kind: 'accept', title: 'Discord arithmetic test',
+            scope: trigger.text, name: 'discord-sum',
+            reason: { code: 'explicitRouted' }, acknowledgement: 'Test accepted.' })
+        })
+      }, value => discordHealth.set(value)).catch(error => {
+        if (!this.lifetime.aborted) {
+          discordHealth.set({ state: 'error', detail: 'Discord listener stopped; check credentials and channel access', at: now() })
+          this.ctx.logger.warn(error instanceof Error && /^Discord API HTTP \d+$/.test(error.message)
+          ? error.message : 'Discord lab listener stopped; check local configuration and connectivity.')
+        }
+      })
+    } else if (fixture && process.env.DSH_SUPERAGENT_GITHUB_ISSUE) {
       const trigger = githubIssueTrigger(process.env.DSH_SUPERAGENT_GITHUB_ISSUE)
       this.store.atomic(() => {
         if (this.store.triggers.disposition(trigger.id)?.decisionId) return
@@ -269,7 +317,7 @@ export class Runtime extends Service implements SourceHost {
       const ids = [this.masterId, ...this.store.tickets.list().map(ticket => workerSessionId(ticket.id))]
       const agents = ids.map(id => this.ctx.agents.get(id as SessionId)).filter((agent): agent is Agent => agent !== undefined)
       for (const agent of agents) agent.cancel({ kind: 'user' }, { keepInbox: true })
-      await Promise.allSettled([passes, this.effects.drain(), ...agents.map(agent => agent.whenIdle())])
+      await Promise.allSettled([passes, this.effects.drain(), ...(this.discordTask ? [this.discordTask] : []), ...agents.map(agent => agent.whenIdle())])
       // The workers' jobs and subagents stop too: their ends would start worker turns without the tool limits released below.
       await this.executor.shutdown()
       this.executor.dispose()

@@ -33,3 +33,5 @@ The orchestrator extracts delivery facts and writes a new notification; it must 
 Use the source routing metadata and worker report when replying; for missing technical facts, wait for the worker's report, or request one with orchestrator_ticket_request_status when the ticket is idle, rather than investigating yourself.
 Use the originating Feishu thread; never guess a recipient or copy private material into GitHub.
 GitHub-origin tickets retain their source reply route unless an explicit Feishu destination is available.
+
+Native Discord queues a structured human_action question through the host using its attention reply ID. Do not post that question again or bypass a pending receipt. Worker summaries remain internal: the orchestrator composes human-facing results and answers with orchestrator_reply, as for other Sources.
