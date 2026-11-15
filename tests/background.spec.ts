@@ -38,23 +38,33 @@ it('stops waiting for subagents that never settle once the host stops', async ()
   expect(await quiet).toBe(false)
 })
 
-it('settles a worker on a host without a subagent join once its catalog has no live child', async () => {
-  const { ctx, agent, subagents } = setup(async () => false)
-  const service = { listChildren: vi.fn(subagents.listChildren) }
+it('joins progressing work using the installed DSH tree API', async () => {
+  const { ctx, agent } = setup(async () => false)
+  const work = Promise.withResolvers<boolean>()
+  const service = { waitForTreeWork: vi.fn().mockReturnValueOnce(work.promise).mockResolvedValue(false) }
   vi.spyOn(ctx, 'get').mockImplementation((name: string) => name === 'subagents' ? service as never : undefined as never)
-  const lookup = vi.spyOn(ctx.agents, 'get').mockReturnValue(agent)
-  const stop = new AbortController()
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-  try {
-    const settled = vi.fn()
-    const quiet = untilQuiet(ctx, agent, stop.signal).then(settled)
-    await vi.advanceTimersByTimeAsync(10)
-    expect(settled).not.toHaveBeenCalled()
-    lookup.mockReturnValue(undefined)
-    await vi.advanceTimersByTimeAsync(300)
-    await quiet
-    expect(settled).toHaveBeenCalledWith(true)
-  } finally { stop.abort(); vi.useRealTimers() }
+  const settled = vi.fn()
+  const quiet = untilQuiet(ctx, agent, new AbortController().signal).then(settled)
+  expect(service.waitForTreeWork).toHaveBeenCalledWith(agent)
+  expect(settled).not.toHaveBeenCalled()
+  work.resolve(true)
+  await quiet
+  expect(settled).toHaveBeenCalledWith(true)
+  expect(service.waitForTreeWork).toHaveBeenCalledTimes(2)
+})
+
+it('interrupts descendants at handoff without closing the worker tree to future delegation', async () => {
+  const { ctx, agent } = setup(async () => false)
+  const service = { listDescendants: vi.fn(async () => [{ id: 'child-1' }, { id: 'grandchild-1' }]),
+    interrupt: vi.fn(), waitForTreeWork: vi.fn(async () => true), drainDescendants: vi.fn() }
+  vi.spyOn(ctx, 'get').mockImplementation((name: string) => name === 'subagents' ? service as never : undefined as never)
+  await stopSubagents(ctx, agent, true)
+  expect(service.interrupt.mock.calls).toEqual([
+    ['child-1', { kind: 'ancestor', agent }], ['grandchild-1', { kind: 'ancestor', agent }],
+  ])
+  expect(service.waitForTreeWork).toHaveBeenCalledWith(agent)
+  expect(service.drainDescendants).not.toHaveBeenCalled()
+  expect(agent.cancel).toHaveBeenCalledWith({ kind: 'user' }, { keepInbox: true })
 })
 
 it('looks at the jobs only when one ends, not at each output of a noisy one', async () => {
