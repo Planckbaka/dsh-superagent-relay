@@ -33,6 +33,8 @@ DSH_SUPERAGENT_READ_ONLY=1 DSH_SUPERAGENT_LOCAL_FIXTURE=1 dsh relay --host 127.0
 
 Use the launch URL and open **Superagent → Ended tickets**. Use a fresh state directory: fixture mode replaces the Source configuration in its database. Do not expose this experimental profile to the network. The upstream repository automation mode grants Workers broader permissions; it is outside the verified preview and should never use a personal maintainer credential.
 
+To keep the preview running as a service — profile configuration, preview modes, the service script, backups and upgrades — see [deploying the Relay preview](docs/relay-deployment.md).
+
 ## Build and contribute
 
 Node 24 and the pnpm version in `package.json`:
