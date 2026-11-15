@@ -444,6 +444,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/model-surface.spec.ts` | Everything models read: tools, prompts, skills and inputs, checked against the tool schemas, the execution environment and the glossary, within a size budget per role |
 | `tests/deployment.spec.ts`, `tests/environment.spec.ts`, `tests/index.spec.ts` | The plugin configuration and setup, the agent's process environment, the plugin entry |
 | `tests/watchdog.spec.ts` | Actual subprocess crash/restart, authenticated health probes, intentional shutdown and secret-free snapshots |
+| `tests/release-verification.spec.ts` | Release archive integrity, private-content detection, unsafe paths and size limits. |
 | `tests/bootstrap.spec.ts` | Fresh profile bootstrap, native write permission checks, account separation and credential redaction |
 | `tests/discord-source.spec.ts` | Native Discord authorization, transient intake, chunk recovery, pause, question/resume and delivery isolation |
 | `tests/discord-chat.spec.ts` | Conversation authorization, delivery, restart and command regression coverage |

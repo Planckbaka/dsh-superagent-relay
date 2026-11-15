@@ -2,7 +2,7 @@
   "name": "dsh-superagent-relay",
   "author": "Superagent Relay contributors",
   "license": "MIT",
-  "version": "0.1.0-preview.2",
+  "version": "0.1.0-rc.1",
   "private": true,
   "description": "DeepSeek Harness Superagent with native Discord intake, policy-gated work, persistent delivery and configurable execution permissions.",
   "type": "module",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-rc.1 (unreleased)
+
+- Add read-only GitHub checks for locked installation, typecheck/tests/build and exact distribution inspection, with immutable external action pins and no stored Git credentials.
+- Add a standalone archive inspector for required assets, version/identity, unsafe members, duplicates, unpacked limits, private files and credential/home-path matches; error output never includes matched values.
+- Track stable promotion using separate real-task, clarification, recovery, artifact and independent-review evidence. Preview.2 remains immutable while these gates are pending.
+
 ## 0.1.0-preview.2
 
 - Replace the fixture-first deployment instructions with native Discord/GitHub setup in a fresh authenticated DSH profile.

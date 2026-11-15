@@ -49,6 +49,8 @@ Stop the old listener before enabling the new Discord Source. Preserve a private
 
 ## Build and contribute
 
+Stable `0.1.0` preparation is tracked in [stable release acceptance](docs/012-stable-acceptance.md). The published preview remains available while real-task, recovery and independent review gates are completed. Repository checks now test, build and inspect the candidate archive automatically; they never publish or merge.
+
 Use Node 24 and the pnpm version in `package.json`:
 
 ```sh
